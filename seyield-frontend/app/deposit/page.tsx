@@ -3,6 +3,7 @@ import { DepositInfo } from "@/components/deposit/deposit-info"
 import { DepositTour } from "@/components/tour/deposit-tour"
 import { BackgroundPattern } from "@/components/ui/background-pattern"
 import { WalletBalanceDisplay } from "@/components/wallet/balance-display"
+import { PSYLDBalanceDisplay } from "@/components/deposit/psyld-balance-display"
 
 export default function DepositPage() {
   return (
@@ -15,8 +16,9 @@ export default function DepositPage() {
         </p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <div className="space-y-6">
-            <DepositInfo />
             <WalletBalanceDisplay />
+            <PSYLDBalanceDisplay />
+            <DepositInfo />
           </div>
           <DepositForm />
         </div>

@@ -58,6 +58,11 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/faucet" className="text-muted-foreground hover:text-primary transition-colors">
+                  Faucet
+                </Link>
+              </li>
+              <li>
                 <Link href="/how-it-works" className="text-muted-foreground hover:text-primary transition-colors">
                   How It Works
                 </Link>

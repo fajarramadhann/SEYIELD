@@ -18,6 +18,7 @@ const navItems = [
   { name: "Withdraw", href: "/withdraw" },
   { name: "Swap", href: "/swap" },
   { name: "Shop", href: "/shop" },
+  { name: "Faucet", href: "/faucet" },
   { name: "How It Works", href: "/how-it-works" },
 ]
 

@@ -5,7 +5,7 @@ import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 
 interface BackgroundPatternProps {
-  variant?: "default" | "dashboard" | "deposit" | "withdraw" | "swap" | "shop" | "how-it-works"
+  variant?: "default" | "dashboard" | "deposit" | "withdraw" | "swap" | "shop" | "how-it-works" | "faucet"
   className?: string
 }
 
@@ -47,6 +47,10 @@ export function BackgroundPattern({ variant = "default", className }: Background
         return isDark
           ? "from-blue-900/10 via-violet-900/5 to-transparent"
           : "from-blue-200/30 via-violet-200/20 to-transparent"
+      case "faucet":
+        return isDark
+          ? "from-cyan-900/10 via-violet-900/5 to-transparent"
+          : "from-cyan-200/30 via-violet-200/20 to-transparent"
       default:
         return isDark
           ? "from-pink-900/10 via-violet-900/5 to-transparent"

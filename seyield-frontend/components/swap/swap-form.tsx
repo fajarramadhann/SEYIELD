@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion"
 import { useToast } from "@/components/ui/use-toast"
 import { ArrowDownUp } from "lucide-react"
-import { useWallet } from "@/components/web3/wallet-provider"
+import { useAccount } from "wagmi"
 
 const TOKENS = {
   pUSDC: { name: "pUSDC", price: 1.0, balance: 2400 },
@@ -24,7 +24,7 @@ export function SwapForm() {
   const [toToken, setToToken] = useState("pSEI")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
-  const { address } = useWallet()
+  const { address, isConnected } = useAccount()
 
   const handleSwap = () => {
     if (fromToken === toToken) {
@@ -98,7 +98,7 @@ export function SwapForm() {
           <div className="space-y-2">
             <div className="flex justify-between">
               <Label htmlFor="fromToken">From</Label>
-              <button onClick={handleSetMax} className="text-xs text-primary hover:underline">
+              <button type="button" onClick={handleSetMax} className="text-xs text-primary hover:underline">
                 Max: {getMaxBalance()} {fromToken}
               </button>
             </div>

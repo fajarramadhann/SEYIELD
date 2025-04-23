@@ -49,4 +49,20 @@ verify-sei:
 deploy-sei-testnet-no-sei:
     forge script script/DeploySEI_NoSEI.s.sol:DeploySEI --rpc-url https://evm-rpc-testnet.sei-apis.com --broadcast -vvvv
 
+# Deploy USDC-only faucet
+deploy-usdc-only-faucet:
+	forge script script/DeployUSDCOnlyFaucet.s.sol:DeployUSDCOnlyFaucet --rpc-url https://evm-rpc-testnet.sei-apis.com --broadcast -vvvv
+
+# Fund the faucet with USDC
+fund-faucet:
+	forge script script/FundFaucet.s.sol:FundFaucet --rpc-url https://evm-rpc-testnet.sei-apis.com --private-key $(PRIVATE_KEY) --broadcast -vvvv
+
+# Fund the faucet with USDC (simplified version with hardcoded addresses)
+fund-faucet-simple:
+	forge script script/FundFaucetSimple.s.sol:FundFaucetSimple --rpc-url https://evm-rpc-testnet.sei-apis.com --private-key $(PRIVATE_KEY) --broadcast -vvvv
+
+# Fund the faucet with USDC (no mint attempt, uses IERC20 interface)
+fund-faucet-no-mint:
+	forge script script/FundFaucetNoMint.s.sol:FundFaucetNoMint --rpc-url https://evm-rpc-testnet.sei-apis.com --private-key $(PRIVATE_KEY) --broadcast -vvvv
+
 # Other commands can be added here as needed
