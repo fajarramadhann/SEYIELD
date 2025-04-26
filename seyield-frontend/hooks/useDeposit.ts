@@ -286,8 +286,22 @@ export function useDeposit(): DepositHookReturn {
         refetchUsdcBalance(),
         refetchPSyldBalance(),
         refetchYSyldBalance()
-      ]).then(() => {
+      ]).then(([_userInfoResult, usdcResult, pSyldResult, ySyldResult]) => {
         console.log("Initial balance refresh complete");
+
+        // Log the updated balances for verification
+        console.log("Updated balances after deposit:", {
+          usdc: usdcResult.data && typeof usdcResult.data === 'bigint' ? formatUnits(usdcResult.data, 6) : "unknown",
+          pSyld: pSyldResult.data && typeof pSyldResult.data === 'bigint' ? formatUnits(pSyldResult.data, 6) : "unknown",
+          ySyld: ySyldResult.data && typeof ySyldResult.data === 'bigint' ? formatUnits(ySyldResult.data, 6) : "unknown"
+        });
+
+        // Verify that USDC balance is now 0 (or close to 0)
+        if (usdcResult.data && typeof usdcResult.data === 'bigint' && usdcResult.data > BigInt(0)) {
+          console.log("USDC balance is not 0 after deposit. This might indicate an issue with the deposit process.");
+        } else {
+          console.log("USDC balance is correctly 0 after deposit.");
+        }
       });
 
       // Second refetch after a delay to ensure blockchain state is updated
@@ -328,12 +342,48 @@ export function useDeposit(): DepositHookReturn {
           if (usdcBalance && typeof usdcBalance === 'bigint' &&
               pSyldBalance && typeof pSyldBalance === 'bigint' &&
               ySyldBalance && typeof ySyldBalance === 'bigint') {
+
+            // Check if USDC balance is 0 after deposit
+            const usdcIsZero = usdcBalance === BigInt(0);
+
+            // Check if pSYLD balance increased by the deposit amount
+            const depositAmountBigInt = depositAmount ? parseUnits(depositAmount, 6) : BigInt(0);
+            const expectedPSYLD = depositAmountBigInt;
+            const pSyldIsCorrect = pSyldBalance >= expectedPSYLD;
+
+            // Check if ySYLD balance increased by 7% of deposit amount
+            const expectedYSYLD = depositAmountBigInt * BigInt(7) / BigInt(100);
+            const ySyldIsCorrect = ySyldBalance >= expectedYSYLD;
+
+            // Log detailed balance verification
+            console.log("Final balance verification:", {
+              usdcIsZero,
+              pSyldIsCorrect,
+              ySyldIsCorrect,
+              depositAmount,
+              expectedPSYLD: formatUnits(expectedPSYLD, 6),
+              actualPSYLD: formatUnits(pSyldBalance, 6),
+              expectedYSYLD: formatUnits(expectedYSYLD, 6),
+              actualYSYLD: formatUnits(ySyldBalance, 6)
+            });
+
+            // Show toast with balance information
             toast({
               title: "All balances confirmed",
               description: `USDC: ${formatUnits(usdcBalance, 6)}, pSYLD: ${formatUnits(pSyldBalance, 6)}, ySYLD: ${formatUnits(ySyldBalance, 6)}`,
               variant: "default",
               duration: 5000,
             });
+
+            // Show additional toast if balances don't match expectations
+            if (!usdcIsZero || !pSyldIsCorrect || !ySyldIsCorrect) {
+              toast({
+                title: "Balance verification",
+                description: "Some balances may not have updated correctly. Try refreshing the page or checking again later.",
+                variant: "default",
+                duration: 8000,
+              });
+            }
           }
         });
       }, 6000)

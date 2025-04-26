@@ -345,6 +345,7 @@ export function useMerchantContract() {
     items,
     purchases,
     ySYLDBalance,
+    purchaseData,
 
     // Functions
     handlePurchaseItem,
