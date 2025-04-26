@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { readContract } from 'wagmi/actions'
 import { parseUnits, formatUnits } from 'viem'
 import { contractAddresses } from '@/app/config/contract-addresses'
 import { merchantAbi } from '@/app/config/abis/merchant-abi'
@@ -101,7 +102,7 @@ export function useMerchantContract() {
               args: [BigInt(i)],
             })
 
-            if (itemInfo && itemInfo.isActive) {
+            if (itemInfo?.isActive) {
               itemsArray.push({
                 id: i,
                 merchant: itemInfo.merchant,
@@ -173,7 +174,57 @@ export function useMerchantContract() {
     }
 
     loadPurchases()
-  }, [address, isConnected, purchaseCount, isPurchaseComplete])
+  }, [address, isConnected, purchaseCount])
+
+  // Define refreshData function with useCallback to avoid dependency issues
+  const refreshData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      // Refresh all contract data
+      const [ySYLDResult, itemCountResult, purchaseCountResult] = await Promise.all([
+        refetchYSYLDBalance(),
+        refetchItemCount(),
+        refetchPurchaseCount()
+      ])
+
+      console.log("Data refreshed:", {
+        ySYLDBalance: ySYLDResult.data ? formatUnits(ySYLDResult.data, 6) : "0",
+        itemCount: itemCountResult.data,
+        purchaseCount: purchaseCountResult.data
+      })
+
+      // Show toast notification
+      toast({
+        title: "Data refreshed",
+        description: "Marketplace data has been updated.",
+        duration: 3000,
+      })
+    } catch (error) {
+      console.error("Error refreshing data:", error)
+      toast({
+        title: "Refresh failed",
+        description: "Failed to refresh marketplace data. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [refetchYSYLDBalance, refetchItemCount, refetchPurchaseCount, toast])
+
+  // Handle purchase completion
+  useEffect(() => {
+    if (isPurchaseComplete) {
+      toast({
+        title: "Purchase successful!",
+        description: "Your purchase has been completed successfully.",
+        duration: 5000,
+      })
+
+      // Refresh data after successful purchase
+      refreshData()
+    }
+  }, [isPurchaseComplete, toast, refreshData])
 
   // Handle purchase errors
   useEffect(() => {
@@ -183,7 +234,17 @@ export function useMerchantContract() {
       // Extract revert reason if available
       let errorMessage = purchaseError.message || "Failed to complete purchase. Please try again."
       if (typeof errorMessage === 'string' && errorMessage.includes('execution reverted:')) {
-        errorMessage = errorMessage.split('execution reverted:')[1].trim()
+        const revertPart = errorMessage.split('execution reverted:')[1]
+        if (revertPart) {
+          errorMessage = revertPart.trim()
+
+          // Provide more user-friendly error messages
+          if (errorMessage.includes('InsufficientYield')) {
+            errorMessage = "You don't have enough ySYLD tokens to make this purchase."
+          } else if (errorMessage.includes('InvalidItem')) {
+            errorMessage = "This item is no longer available for purchase."
+          }
+        }
       }
 
       toast({
@@ -218,15 +279,25 @@ export function useMerchantContract() {
         return
       }
 
+      // Refresh ySYLD balance to ensure we have the latest data
+      await refetchYSYLDBalance()
+
       // Check if user has enough ySYLD
       if (ySYLDBalance && ySYLDBalance < item.price) {
         toast({
           title: "Insufficient ySYLD",
-          description: `You need at least ${formatUnits(item.price, 6)} ySYLD tokens to purchase this item.`,
+          description: `You need at least ${formatUnits(item.price, 6)} ySYLD tokens to purchase this item. You currently have ${formatUnits(ySYLDBalance, 6)} ySYLD.`,
           variant: "destructive",
         })
         return
       }
+
+      // Show notification that purchase is being prepared
+      toast({
+        title: "Preparing purchase...",
+        description: `Getting ready to purchase ${item.name} for ${formatUnits(item.price, 6)} ySYLD.`,
+        duration: 3000,
+      })
 
       // Execute purchase - this will burn ySYLD tokens and automatically pay the merchant
       await purchaseItem({
@@ -235,24 +306,36 @@ export function useMerchantContract() {
         functionName: 'purchaseItem',
         args: [BigInt(itemId)],
       })
+
+      // Show notification that transaction is being processed
+      toast({
+        title: "Purchase initiated",
+        description: "Please confirm the transaction in your wallet. This will use your ySYLD tokens.",
+        duration: 5000,
+      })
     } catch (error) {
       console.error('Error purchasing item:', error)
+
+      // Provide more specific error message if possible
+      let errorMessage = "Failed to purchase item. Please try again."
+      if (error instanceof Error) {
+        if (error.message.includes("user rejected")) {
+          errorMessage = "You rejected the transaction in your wallet. You can try again when ready."
+        } else if (error.message.includes("insufficient funds")) {
+          errorMessage = "You don't have enough SEI to pay for the transaction gas fees."
+        }
+      }
+
       toast({
         title: "Purchase error",
-        description: "Failed to purchase item. Please try again.",
+        description: errorMessage,
         variant: "destructive",
+        duration: 5000,
       })
     }
   }
 
-  // Function to refresh data
-  const refreshData = async () => {
-    await Promise.all([
-      refetchYSYLDBalance(),
-      refetchItemCount(),
-      refetchPurchaseCount()
-    ])
-  }
+
 
   return {
     // State
@@ -272,9 +355,4 @@ export function useMerchantContract() {
   }
 }
 
-// Helper function to read contract data
-async function readContract({ address, abi, functionName, args }) {
-  // This is a placeholder - in a real implementation, you would use a library like viem or ethers.js
-  // to read contract data. For now, we'll just return mock data.
-  return null
-}
+

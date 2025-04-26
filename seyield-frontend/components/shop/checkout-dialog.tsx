@@ -42,32 +42,58 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
       toast({
         title: "Wallet not connected",
         description: "Please connect your wallet to make a purchase.",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 5000,
       })
       return
     }
 
     // Check if user has enough ySYLD
-    if (ySYLDBalance && ySYLDBalance < BigInt(product.price * 10**6)) {
-      setErrorMessage(`Insufficient ySYLD balance. You need at least ${product.price} ySYLD.`)
+    if (ySYLDBalance && typeof ySYLDBalance === 'bigint' && ySYLDBalance < BigInt(product.price * 10**6)) {
+      setErrorMessage(`Insufficient ySYLD balance. You need at least ${product.price} ySYLD but you only have ${formattedYSYLDBalance} ySYLD.`)
       setStep("error")
       return
     }
 
-    setStep("processing")
-
     try {
+      // Show toast notification that purchase is being initiated
+      toast({
+        title: "Initiating purchase...",
+        description: "Please confirm the transaction in your wallet when prompted.",
+        duration: 5000,
+      })
+
       // Call the merchant contract to purchase the item
+      // The loading state will be handled by the useEffect watching isPurchaseLoading
       await handlePurchaseItem(product.id)
     } catch (error) {
       console.error('Purchase error:', error)
-      setErrorMessage(error?.message || "Failed to complete purchase. Please try again.")
+
+      // Provide more specific error message if possible
+      let errorMsg = "Failed to complete purchase. Please try again."
+      if (error instanceof Error) {
+        if (error.message.includes("user rejected")) {
+          errorMsg = "You rejected the transaction in your wallet. You can try again when ready."
+        } else if (error.message.includes("insufficient funds")) {
+          errorMsg = "You don't have enough SEI to pay for the transaction gas fees."
+        } else {
+          errorMsg = error.message
+        }
+      }
+
+      setErrorMessage(errorMsg)
       setStep("error")
     }
   }
 
-  // Watch for purchase completion
+  // Watch for purchase loading and completion states
   useEffect(() => {
+    // When purchase is loading, show processing step
+    if (isPurchaseLoading) {
+      setStep("processing")
+    }
+
+    // When purchase is complete, show success step
     if (isPurchaseComplete) {
       // Set the transaction ID to the purchase ID
       setTransactionId(product.id.toString())
@@ -76,9 +102,10 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
       toast({
         title: "Purchase successful!",
         description: `You've purchased ${product.name} for ${product.price} USDC using your rewards.`,
+        duration: 5000,
       })
     }
-  }, [isPurchaseComplete, product, toast])
+  }, [isPurchaseLoading, isPurchaseComplete, product, toast])
 
   // Reset step when dialog opens
   useEffect(() => {
@@ -181,7 +208,7 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
             <DialogHeader>
               <DialogTitle>Processing Your Purchase</DialogTitle>
               <DialogDescription>
-                Please wait while we process your transaction...
+                Please wait while we process your transaction. This may take a few moments.
               </DialogDescription>
             </DialogHeader>
             <div className="py-8 flex flex-col items-center justify-center">
@@ -190,6 +217,10 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
                 <div className="flex justify-between text-sm">
                   <span>Verifying ySYLD balance</span>
                   <CheckCircle className="h-4 w-4 text-green-500" />
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Confirming transaction</span>
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Burning ySYLD tokens</span>
@@ -203,6 +234,11 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
                   <span>Generating receipt</span>
                   <span>Pending</span>
                 </div>
+              </div>
+
+              <div className="mt-6 text-sm text-center text-muted-foreground">
+                <p>Please confirm the transaction in your wallet if prompted.</p>
+                <p className="mt-2">Do not close this window until the transaction is complete.</p>
               </div>
             </div>
           </>
@@ -245,14 +281,34 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
                   <span className="font-medium">{transactionId}</span>
                 </div>
                 <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Item:</span>
+                  <span className="font-medium">{product?.name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Amount:</span>
                   <span className="font-medium">{product?.price} USDC</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">ySYLD Spent:</span>
+                  <span className="font-medium">{product?.price} ySYLD</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Status:</span>
                   <span className="text-green-500">Completed</span>
                 </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Date:</span>
+                  <span className="font-medium">{new Date().toLocaleString()}</span>
+                </div>
               </div>
+
+              <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-4 text-sm text-green-700 dark:text-green-300 mb-6">
+                <p className="flex items-center gap-2">
+                  <InfoIcon className="h-4 w-4" />
+                  <span>The merchant has been paid automatically by the SEYIELD platform. Your ySYLD tokens have been burned.</span>
+                </p>
+              </div>
+
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => onOpenChange(false)}>
                   Close

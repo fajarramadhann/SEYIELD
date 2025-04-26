@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSimulateContract } from 'wagmi'
 import { parseUnits, formatUnits } from 'viem'
 import { contractAddresses } from '@/app/config/contract-addresses'
@@ -16,6 +16,7 @@ export interface DepositHookReturn {
   isDepositLoading: boolean;
   isApproveComplete: boolean;
   isDepositComplete: boolean;
+  depositAmount: string;
   userInfo: { deposit: bigint; depositTime: bigint; hasWithdrawn: boolean } | undefined;
   usdcBalance: bigint | undefined;
   pSyldBalance: bigint | undefined;
@@ -33,7 +34,7 @@ export function useDeposit(): DepositHookReturn {
   const [isApproved, setIsApproved] = useState(false)
   const [isCheckingApproval, setIsCheckingApproval] = useState(false)
   const [depositAmount, setDepositAmount] = useState<string>('')
-  const [isDepositLoading, setIsDepositLoading] = useState(false)
+  const [isManualDepositLoading, setIsManualDepositLoading] = useState(false)
 
   // Get user's deposit info
   const { data: userInfo, refetch: refetchUserInfo } = useReadContract({
@@ -44,7 +45,10 @@ export function useDeposit(): DepositHookReturn {
     query: {
       enabled: !!address && isConnected,
     }
-  })
+  }) as {
+    data: { deposit: bigint; depositTime: bigint; hasWithdrawn: boolean } | undefined;
+    refetch: () => Promise<{ data: { deposit: bigint; depositTime: bigint; hasWithdrawn: boolean } | undefined }>
+  }
 
   // Get user's USDC allowance for the vault
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
@@ -55,7 +59,7 @@ export function useDeposit(): DepositHookReturn {
     query: {
       enabled: !!address && isConnected,
     }
-  })
+  }) as { data: bigint | undefined; refetch: () => Promise<{ data: bigint | undefined }> }
 
   // Get user's USDC balance
   const { data: usdcBalance, refetch: refetchUsdcBalance } = useReadContract({
@@ -66,7 +70,7 @@ export function useDeposit(): DepositHookReturn {
     query: {
       enabled: !!address && isConnected,
     }
-  })
+  }) as { data: bigint | undefined; refetch: () => Promise<{ data: bigint | undefined }> }
 
   // Log USDC balance changes for debugging
   useEffect(() => {
@@ -84,7 +88,7 @@ export function useDeposit(): DepositHookReturn {
     query: {
       enabled: !!address && isConnected,
     }
-  })
+  }) as { data: bigint | undefined; refetch: () => Promise<{ data: bigint | undefined }> }
 
   // Get user's ySYLD balance
   const { data: ySyldBalance, refetch: refetchYSyldBalance } = useReadContract({
@@ -95,13 +99,12 @@ export function useDeposit(): DepositHookReturn {
     query: {
       enabled: !!address && isConnected,
     }
-  })
+  }) as { data: bigint | undefined; refetch: () => Promise<{ data: bigint | undefined }> }
 
   // Approve USDC spending
   const {
     data: approveData,
     isPending: isApproveLoading,
-    isSuccess: isApproveStarted,
     writeContract: approveUsdc,
     error: approveError
   } = useWriteContract()
@@ -117,8 +120,7 @@ export function useDeposit(): DepositHookReturn {
   // Deposit USDC
   const {
     data: depositData,
-    isPending: isDepositPending,
-    isSuccess: isDepositStarted,
+    isPending: isDepositLoading,
     writeContract: depositUsdc,
     error: depositError
   } = useWriteContract()
@@ -161,7 +163,7 @@ export function useDeposit(): DepositHookReturn {
 
   // Handle approval completion
   useEffect(() => {
-    if (isApproveComplete && depositAmount) {
+    if (isApproveComplete && depositAmount && !isDepositComplete) {
       console.log("Approval complete, preparing to deposit...");
 
       // Show success notification for approval
@@ -192,6 +194,12 @@ export function useDeposit(): DepositHookReturn {
       const depositTimer = setTimeout(() => {
         console.log("Initiating automatic deposit after approval...");
         try {
+          // Check if deposit is already complete or in progress
+          if (isDepositComplete || isDepositLoading) {
+            console.log("Deposit already complete or in progress, skipping automatic deposit");
+            return;
+          }
+
           // Clear notification that deposit is starting
           toast({
             title: "Starting deposit transaction",
@@ -231,7 +239,7 @@ export function useDeposit(): DepositHookReturn {
       // Cleanup function to prevent memory leaks
       return () => clearTimeout(depositTimer);
     }
-  }, [isApproveComplete, depositAmount, toast, refetchAllowance, depositUsdc])
+  }, [isApproveComplete, depositAmount, isDepositComplete, isDepositLoading, toast, refetchAllowance, depositUsdc])
 
   // Handle deposit completion
   useEffect(() => {
@@ -250,18 +258,14 @@ export function useDeposit(): DepositHookReturn {
 
       // Open transaction in explorer if available
       if (depositData) {
-        const explorerUrl = `https://sei.explorers.guru/tx/${depositData.hash}`;
+        const txHash = typeof depositData === 'string' ? depositData : '';
+        const explorerUrl = `https://testnet.seistream.app/transactions/${txHash}`;
 
         // Create a clickable link to the transaction
         toast({
           title: "Transaction confirmed on blockchain",
-          description: "Your transaction has been confirmed. Click below to view details.",
-          duration: 8000,
-          // Use a simple function for the action instead of JSX
-          action: {
-            altText: "View Transaction",
-            onClick: () => window.open(explorerUrl, '_blank')
-          }
+          description: `Your transaction has been confirmed. View it at: ${explorerUrl}`,
+          duration: 8000
         })
 
         // Log the transaction URL for reference
@@ -298,7 +302,8 @@ export function useDeposit(): DepositHookReturn {
           console.log("Second balance refresh complete");
 
           // Show updated balances notification
-          if (pSyldBalance && ySyldBalance) {
+          if (pSyldBalance && typeof pSyldBalance === 'bigint' &&
+              ySyldBalance && typeof ySyldBalance === 'bigint') {
             toast({
               title: "Balances updated",
               description: `Your current balances: ${formatUnits(pSyldBalance, 6)} pSYLD and ${formatUnits(ySyldBalance, 6)} ySYLD`,
@@ -320,7 +325,9 @@ export function useDeposit(): DepositHookReturn {
           console.log("Final balance refresh complete");
 
           // Show final confirmation with all balances
-          if (usdcBalance && pSyldBalance && ySyldBalance) {
+          if (usdcBalance && typeof usdcBalance === 'bigint' &&
+              pSyldBalance && typeof pSyldBalance === 'bigint' &&
+              ySyldBalance && typeof ySyldBalance === 'bigint') {
             toast({
               title: "All balances confirmed",
               description: `USDC: ${formatUnits(usdcBalance, 6)}, pSYLD: ${formatUnits(pSyldBalance, 6)}, ySYLD: ${formatUnits(ySyldBalance, 6)}`,
@@ -346,14 +353,15 @@ export function useDeposit(): DepositHookReturn {
 
   // Show prominent toast for deposit pending
   useEffect(() => {
-    if (isDepositLoading) {
+    const isAnyDepositLoading = isDepositLoading || isManualDepositLoading || isDepositConfirming;
+    if (isAnyDepositLoading) {
       toast({
         title: "Deposit pending...",
         description: "Waiting for your deposit transaction to be confirmed on the blockchain.",
         duration: 6000,
       });
     }
-  }, [isDepositLoading, toast]);
+  }, [isDepositLoading, isManualDepositLoading, isDepositConfirming, toast]);
 
   // Handle approval errors with detailed messages
   useEffect(() => {
@@ -529,7 +537,7 @@ export function useDeposit(): DepositHookReturn {
     if (!amount || !isConnected) return
 
     setDepositAmount(amount)
-    setIsDepositLoading(true)
+    setIsManualDepositLoading(true)
     try {
       // Validasi: amount harus > 0
       if (Number(amount) <= 0) {
@@ -539,7 +547,7 @@ export function useDeposit(): DepositHookReturn {
           variant: "destructive",
           duration: 8000,
         });
-        setIsDepositLoading(false)
+        setIsManualDepositLoading(false)
         return;
       }
 
@@ -554,7 +562,7 @@ export function useDeposit(): DepositHookReturn {
           variant: "destructive",
           duration: 8000,
         });
-        setIsDepositLoading(false)
+        setIsManualDepositLoading(false)
         return;
       }
 
@@ -566,7 +574,7 @@ export function useDeposit(): DepositHookReturn {
           variant: "destructive",
           duration: 8000,
         });
-        setIsDepositLoading(false)
+        setIsManualDepositLoading(false)
         return;
       }
 
@@ -607,8 +615,8 @@ export function useDeposit(): DepositHookReturn {
       console.log("Depositing USDC:", {
         fundsVault: contractAddresses.fundsVault,
         amount: parsedAmount.toString(),
-        userBalance: usdcBalance ? formatUnits(usdcBalance, 6) : "unknown",
-        allowance: allowance ? formatUnits(allowance, 6) : "unknown"
+        userBalance: usdcBalance && typeof usdcBalance === 'bigint' ? formatUnits(usdcBalance, 6) : "unknown",
+        allowance: allowance && typeof allowance === 'bigint' ? formatUnits(allowance, 6) : "unknown"
       });
 
       // Show notification that transaction is being sent
@@ -619,7 +627,7 @@ export function useDeposit(): DepositHookReturn {
       });
 
       // Execute the deposit transaction
-      await depositUsdc({
+      depositUsdc({
         address: contractAddresses.fundsVault as `0x${string}`,
         abi: fundsVaultAbi,
         functionName: 'deposit',
@@ -629,7 +637,7 @@ export function useDeposit(): DepositHookReturn {
       console.error('Error depositing USDC:', error)
 
       // Hentikan loading jika error
-      setIsDepositLoading(false)
+      setIsManualDepositLoading(false)
 
       // Try to extract a more helpful error message
       let errorMessage = "Failed to deposit USDC. Please try again.";
@@ -662,39 +670,50 @@ export function useDeposit(): DepositHookReturn {
         duration: 10000,
       })
     } finally {
-      setIsDepositLoading(false) // Pastikan loading dihentikan di finally
+      setIsManualDepositLoading(false) // Pastikan loading dihentikan di finally
     }
   }
 
-  // Function to force refresh all balances
-  const forceRefreshBalances = async () => {
+  // Function to force refresh all balances with useCallback to avoid dependency issues
+  const forceRefreshBalances = useCallback(async () => {
     console.log("Force refreshing all balances...");
     try {
-      await refetchUsdcBalance();
-      await refetchPSyldBalance();
-      await refetchYSyldBalance();
-      await refetchUserInfo();
+      toast({
+        title: "Refreshing balances...",
+        description: "Fetching your latest token balances from the blockchain.",
+        duration: 2000,
+      });
+
+      // Refresh all balances in parallel for better performance
+      const [usdcResult, pSyldResult, ySyldResult, _userInfoResult] = await Promise.all([
+        refetchUsdcBalance(),
+        refetchPSyldBalance(),
+        refetchYSyldBalance(),
+        refetchUserInfo()
+      ]);
 
       // Log current balances after refresh
-      if (usdcBalance) {
-        console.log("Current USDC balance after refresh:", formatUnits(usdcBalance, 6));
-      }
-      if (pSyldBalance) {
-        console.log("Current pSYLD balance after refresh:", formatUnits(pSyldBalance, 6));
-      }
-      if (ySyldBalance) {
-        console.log("Current ySYLD balance after refresh:", formatUnits(ySyldBalance, 6));
-      }
+      console.log("Balances refreshed:", {
+        usdc: usdcResult.data && typeof usdcResult.data === 'bigint' ? formatUnits(usdcResult.data, 6) : "0",
+        pSyld: pSyldResult.data && typeof pSyldResult.data === 'bigint' ? formatUnits(pSyldResult.data, 6) : "0",
+        ySyld: ySyldResult.data && typeof ySyldResult.data === 'bigint' ? formatUnits(ySyldResult.data, 6) : "0"
+      });
 
       toast({
-        title: "Balances refreshed",
+        title: "Balances updated",
         description: "Your token balances have been refreshed from the blockchain.",
         duration: 3000,
       });
     } catch (error) {
       console.error("Error refreshing balances:", error);
+      toast({
+        title: "Refresh failed",
+        description: "Failed to refresh your balances. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      });
     }
-  };
+  }, [refetchUsdcBalance, refetchPSyldBalance, refetchYSyldBalance, refetchUserInfo, toast]);
 
   // Function to handle one-click deposit (approve if needed, then deposit)
   // Note: The actual deposit after approval is handled by the approval completion useEffect
@@ -730,7 +749,7 @@ export function useDeposit(): DepositHookReturn {
       const parsedAmount = parseUnits(amount, 6);
 
       // Check if user has enough USDC with the latest balance
-      if (usdcBalance && usdcBalance < parsedAmount) {
+      if (usdcBalance && typeof usdcBalance === 'bigint' && usdcBalance < parsedAmount) {
         toast({
           title: "Insufficient USDC balance",
           description: `You need ${formatUnits(parsedAmount, 6)} USDC but only have ${formatUnits(usdcBalance, 6)} USDC.`,
@@ -741,7 +760,7 @@ export function useDeposit(): DepositHookReturn {
       }
 
       // Re-check approval status with latest data
-      const needsApproval = !allowance || allowance < parsedAmount;
+      const needsApproval = !allowance || (typeof allowance === 'bigint' && allowance < parsedAmount);
 
       // Check if approval is needed
       if (needsApproval) {
@@ -809,7 +828,7 @@ export function useDeposit(): DepositHookReturn {
 
     // Loading states
     isApproveLoading: isApproveLoading || isApproveConfirming,
-    isDepositLoading: isDepositLoading || isDepositConfirming,
+    isDepositLoading: isDepositLoading || isDepositConfirming || isManualDepositLoading,
 
     // Completion states
     isApproveComplete,
