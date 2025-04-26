@@ -16,71 +16,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
+import Link from "next/link"
+import { shopItems } from "@/data/shop-items"
 
-const shopItems = [
-  {
-    id: 1,
-    name: "Coursera Subscription",
-    category: "education",
-    price: 49,
-    depositRequired: 700,
-    description: "Annual subscription to Coursera with access to all courses and specializations.",
-    image: "/placeholder.svg?height=200&width=200",
-    popular: true,
-    details: "Unlimited access to 7,000+ world-class courses, hands-on projects, and job-ready certificate programs.",
-  },
-  {
-    id: 2,
-    name: "Udemy Course Bundle",
-    category: "education",
-    price: 29.99,
-    depositRequired: 428,
-    description: "Bundle of 5 top-rated courses on web development and design.",
-    image: "/placeholder.svg?height=200&width=200",
-    details: "Includes courses on React, Node.js, UI/UX Design, JavaScript, and CSS frameworks.",
-  },
-  {
-    id: 3,
-    name: "Amazon Gift Card",
-    category: "gifts",
-    price: 25,
-    depositRequired: 357,
-    description: "Digital gift card for Amazon with no expiration date.",
-    image: "/placeholder.svg?height=200&width=200",
-    popular: true,
-    details: "Redeemable for millions of items storewide at Amazon.com.",
-  },
-  {
-    id: 4,
-    name: "Spotify Premium",
-    category: "entertainment",
-    price: 9.99,
-    depositRequired: 143,
-    description: "1-year subscription to Spotify Premium.",
-    image: "/placeholder.svg?height=200&width=200",
-    details: "Ad-free music listening, offline downloads, and unlimited skips for 12 months.",
-  },
-  {
-    id: 5,
-    name: "Netflix Subscription",
-    category: "entertainment",
-    price: 15.99,
-    depositRequired: 228,
-    description: "6-month Netflix Standard subscription.",
-    image: "/placeholder.svg?height=200&width=200",
-    details: "Watch on 2 screens at the same time with Full HD (1080p) quality.",
-  },
-  {
-    id: 6,
-    name: "DoorDash Credit",
-    category: "food",
-    price: 20,
-    depositRequired: 286,
-    description: "Credit for food delivery on DoorDash.",
-    image: "/placeholder.svg?height=200&width=200",
-    details: "Order from your favorite restaurants with free delivery on your first order.",
-  },
-]
+// Using the imported shopItems from data file
 
 export function ShopItemsDetailed() {
   const { toast } = useToast()
@@ -166,10 +105,18 @@ export function ShopItemsDetailed() {
               </CardContent>
               <CardFooter className="mt-auto pt-2 flex items-center justify-between">
                 <div className="font-bold">{item.price} USDC</div>
-                <Button size="sm" className="gap-2" variant="outline" onClick={() => openItemDetails(item)}>
-                  <Info className="h-4 w-4" />
-                  Details
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" className="gap-2" variant="outline" onClick={() => openItemDetails(item)}>
+                    <Info className="h-4 w-4" />
+                    Quick View
+                  </Button>
+                  <Button size="sm" className="gap-2" variant="outline" asChild>
+                    <Link href={`/shop/${item.id}`}>
+                      <ShoppingCart className="h-4 w-4" />
+                      Buy
+                    </Link>
+                  </Button>
+                </div>
               </CardFooter>
             </Card>
           </motion.div>

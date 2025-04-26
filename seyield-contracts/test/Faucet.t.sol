@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Faucet} from "../src/Faucet.sol";
@@ -23,32 +23,22 @@ contract FaucetTest is Test {
     }
 
     function testClaimTokens() public {
-        // Make sure USER has ETH to receive
-        vm.deal(USER, 0);
-
         vm.prank(USER);
         faucet.claimTokens();
 
         assertEq(usdc.balanceOf(USER), 1000e6);
-        assertEq(USER.balance, 1 ether);
     }
 
     function test_RevertWhen_ClaimTooSoon() public {
-        // Make sure USER has ETH to receive
-        vm.deal(USER, 0);
-
         vm.prank(USER);
         faucet.claimTokens();
 
         vm.prank(USER);
-        vm.expectRevert("Wait 24h between claims");
+        vm.expectRevert(abi.encodeWithSignature("ClaimTooSoon(uint256)", block.timestamp + 24 hours));
         faucet.claimTokens(); // Should revert
     }
 
     function testClaimAfterInterval() public {
-        // Make sure USER has ETH to receive
-        vm.deal(USER, 0);
-
         vm.prank(USER);
         faucet.claimTokens();
 
@@ -59,20 +49,15 @@ contract FaucetTest is Test {
         faucet.claimTokens(); // Should succeed
 
         assertEq(usdc.balanceOf(USER), 2000e6);
-        assertEq(USER.balance, 2 ether);
     }
 
     function testOwnerDeposit() public {
         vm.startPrank(OWNER);
         usdc.approve(address(faucet), 5000e6);
 
-        // Make sure OWNER has enough ETH
-        vm.deal(OWNER, 10 ether);
-
-        faucet.depositTokens{value: 5 ether}(5000e6);
+        faucet.depositTokens(5000e6);
         vm.stopPrank();
 
         assertEq(usdc.balanceOf(address(faucet)), 15000e6);
-        assertEq(address(faucet).balance, 105 ether);
     }
 }

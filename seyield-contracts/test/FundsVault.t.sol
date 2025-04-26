@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {FundsVault, InvalidAmount} from "../src/Vault.sol";
+import {FundsVault} from "../src/Vault.sol";
 import {MockUSDC} from "../src/MockUSDC.sol";
 import {MockYieldProtocol} from "../src/MockYieldProtocol.sol";
 import {PSYLD} from "../src/PSYLD.sol";
@@ -74,7 +74,8 @@ contract FundsVaultTest is Test {
         vault.deposit(DEPOSIT_AMOUNT);
 
         assertEq(pSYLD.balanceOf(USER), DEPOSIT_AMOUNT);
-        assertEq(ySYLD.balanceOf(address(vault)), DEPOSIT_AMOUNT * 7 / 100); // Changed from 10000 to 100 based on your YIELD_RATIO
+        // ySYLD tokens are now minted directly to the user, not kept in the vault
+        assertEq(ySYLD.balanceOf(USER), DEPOSIT_AMOUNT * 7 / 100);
         assertEq(vault.getPooledAmount(), DEPOSIT_AMOUNT);
 
         vm.stopPrank();
@@ -173,13 +174,13 @@ contract FundsVaultTest is Test {
 
     function test_RevertWhen_ZeroDeposit() public {
         vm.prank(USER);
-        vm.expectRevert(); // Add the expected revert reason if your contract provides one
+        vm.expectRevert(abi.encodeWithSignature("InvalidAmount()"));
         vault.deposit(0);
     }
 
     function test_RevertWhen_ZeroWithdrawal() public {
         vm.prank(USER);
-        vm.expectRevert(InvalidAmount.selector);
+        vm.expectRevert(abi.encodeWithSignature("InvalidAmount()"));
         vault.withdraw(0);
     }
 
@@ -188,14 +189,15 @@ contract FundsVaultTest is Test {
         usdc.approve(address(vault), DEPOSIT_AMOUNT);
         vault.deposit(DEPOSIT_AMOUNT);
 
-        vm.expectRevert(); // Add the expected revert reason if your contract provides one
+        vm.expectRevert(abi.encodeWithSignature("InsufficientBalance()"));
         vault.withdraw(DEPOSIT_AMOUNT + 1);
         vm.stopPrank();
     }
 
     function test_RevertWhen_UnauthorizedYieldHarvest() public {
         vm.prank(USER);
-        vm.expectRevert(); // Add the expected revert reason if your contract provides one
+        // This will revert with Ownable's unauthorized error
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", USER));
         vault.harvestYield();
     }
 }

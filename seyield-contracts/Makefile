@@ -12,22 +12,6 @@ test-verbose:; forge test -vvv
 # Coverage
 coverage:; forge coverage
 
-# Deploy commands
-deploy-sei-testnet:
-    forge script script/DeploySEI.s.sol:DeploySEI \
-    --rpc-url https://evm-rpc-testnet.sei-apis.com \
-    --private-key $(PRIVATE_KEY) \
-    --broadcast \
-    --verify \
-    -vvvv
-
-    seid tx evm deploy script/DeploySEI.s.sol:DeploySEI \
-  --from=xfajarr \
-  --gas-fee-cap=1000000000000 \
-  --gas-limit=5000000 \
-  --evm-rpc=https://evm-rpc-testnet.sei-apis.com \
-  --chain-id=1328
-
 
 # Verify contracts
 verify-sei:
@@ -47,7 +31,7 @@ verify-sei:
 
 # Deploy with script that doesn't fund Faucet with SEI (recommended)
 deploy-sei-testnet-no-sei:
-    forge script script/DeploySEI_NoSEI.s.sol:DeploySEI --rpc-url https://evm-rpc-testnet.sei-apis.com --broadcast -vvvv
+    forge script script/DeploySEI_NoSEI.s.sol:DeploySEI --rpc-url https://evm-rpc-testnet.sei-apis.com --private-key $(PRIVATE_KEY) --broadcast -vvvv
 
 # Deploy USDC-only faucet
 deploy-usdc-only-faucet:

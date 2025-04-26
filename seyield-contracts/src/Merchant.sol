@@ -61,7 +61,7 @@ contract Merchant is Ownable, ReentrancyGuard {
     mapping(address => MerchantInfo) public merchants;
     mapping(uint256 => Item) public items;
     mapping(uint256 => Purchase) public purchases;
-    
+
     address[] public registeredMerchants;
     uint256 public itemCount;
     uint256 public purchaseCount;
@@ -75,6 +75,42 @@ contract Merchant is Ownable, ReentrancyGuard {
     event ItemPurchased(uint256 indexed purchaseId, address indexed buyer, address indexed merchant, uint256 itemId, uint256 price);
     event MerchantPaid(address indexed merchant, uint256 amount);
     event PlatformFeesCollected(uint256 amount);
+
+    /// @dev Error thrown when a zero address is provided
+    error ZeroAddress(string field);
+
+    /// @dev Error thrown when a merchant is already registered
+    error AlreadyRegistered();
+
+    /// @dev Error thrown when a merchant is not registered
+    error NotRegistered();
+
+    /// @dev Error thrown when a name is required but not provided
+    error NameRequired();
+
+    /// @dev Error thrown when an invalid price is provided
+    error InvalidPrice();
+
+    /// @dev Error thrown when an invalid item ID is provided
+    error InvalidItemId();
+
+    /// @dev Error thrown when an item is not available
+    error ItemNotAvailable();
+
+    /// @dev Error thrown when a user has insufficient ySYLD balance
+    error InsufficientYSYLDBalance();
+
+    /// @dev Error thrown when a user is not the owner of an item
+    error NotItemOwner();
+
+    /// @dev Error thrown when there is no pending payment
+    error NoPendingPayment();
+
+    /// @dev Error thrown when there are no fees to collect
+    error NoFeesToCollect();
+
+    /// @dev Error thrown when an invalid purchase ID is provided
+    error InvalidPurchaseId();
 
     /**
      * @notice Constructor to initialize the Merchant contract
@@ -91,10 +127,10 @@ contract Merchant is Ownable, ReentrancyGuard {
         address _treasury,
         address _initialOwner
     ) Ownable(_initialOwner) {
-        if (_usdc == address(0)) revert("Zero USDC address");
-        if (_ySYLD == address(0)) revert("Zero ySYLD address");
-        if (_fundsVault == address(0)) revert("Zero FundsVault address");
-        if (_treasury == address(0)) revert("Zero Treasury address");
+        if (_usdc == address(0)) revert ZeroAddress("usdc");
+        if (_ySYLD == address(0)) revert ZeroAddress("ySYLD");
+        if (_fundsVault == address(0)) revert ZeroAddress("fundsVault");
+        if (_treasury == address(0)) revert ZeroAddress("treasury");
 
         usdc = IERC20(_usdc);
         ySYLD = YSYLD(_ySYLD);
@@ -109,8 +145,8 @@ contract Merchant is Ownable, ReentrancyGuard {
      */
     function registerMerchant(string calldata name, string calldata description) external nonReentrant {
         address sender = msg.sender;
-        require(!merchants[sender].isRegistered, "Already registered");
-        require(bytes(name).length > 0, "Name required");
+        if (merchants[sender].isRegistered) revert AlreadyRegistered();
+        if (bytes(name).length == 0) revert NameRequired();
 
         merchants[sender] = MerchantInfo({
             isRegistered: true,
@@ -131,8 +167,8 @@ contract Merchant is Ownable, ReentrancyGuard {
      */
     function updateMerchant(string calldata name, string calldata description) external {
         address sender = msg.sender;
-        require(merchants[sender].isRegistered, "Not registered");
-        require(bytes(name).length > 0, "Name required");
+        if (!merchants[sender].isRegistered) revert NotRegistered();
+        if (bytes(name).length == 0) revert NameRequired();
 
         merchants[sender].name = name;
         merchants[sender].description = description;
@@ -155,13 +191,15 @@ contract Merchant is Ownable, ReentrancyGuard {
         uint256 requiredYSYLD
     ) external nonReentrant returns (uint256) {
         address sender = msg.sender;
-        require(merchants[sender].isRegistered, "Not registered");
-        require(bytes(name).length > 0, "Name required");
-        require(price > 0, "Price must be > 0");
+        if (!merchants[sender].isRegistered) revert NotRegistered();
+        if (bytes(name).length == 0) revert NameRequired();
+        if (price == 0) revert InvalidPrice();
 
+        // Increment counter and create new item
         itemCount++;
         uint256 newItemId = itemCount;
 
+        // Store item data
         items[newItemId] = Item({
             id: newItemId,
             merchant: sender,
@@ -189,11 +227,13 @@ contract Merchant is Ownable, ReentrancyGuard {
         uint256 requiredYSYLD,
         bool isActive
     ) external {
-        require(itemId > 0 && itemId <= itemCount, "Invalid item ID");
-        Item storage item = items[itemId];
-        require(item.merchant == msg.sender, "Not item owner");
-        require(price > 0, "Price must be > 0");
+        if (itemId == 0 || itemId > itemCount) revert InvalidItemId();
 
+        Item storage item = items[itemId];
+        if (item.merchant != msg.sender) revert NotItemOwner();
+        if (price == 0) revert InvalidPrice();
+
+        // Update item data
         item.price = price;
         item.requiredYSYLD = requiredYSYLD;
         item.isActive = isActive;
@@ -207,19 +247,31 @@ contract Merchant is Ownable, ReentrancyGuard {
      */
     function purchaseItem(uint256 itemId) external nonReentrant {
         address sender = msg.sender;
-        require(itemId > 0 && itemId <= itemCount, "Invalid item ID");
-        
+        if (itemId == 0 || itemId > itemCount) revert InvalidItemId();
+
         Item storage item = items[itemId];
-        require(item.isActive, "Item not available");
-        
+        if (!item.isActive) revert ItemNotAvailable();
+
         // Check if user has enough ySYLD balance to be eligible
         uint256 ySYLDBalance = ySYLD.balanceOf(sender);
-        require(ySYLDBalance >= item.requiredYSYLD, "Insufficient ySYLD balance");
-        
+        if (ySYLDBalance < item.requiredYSYLD) revert InsufficientYSYLDBalance();
+
+        // Calculate platform fee and merchant payment
+        uint256 platformFee = (item.price * PLATFORM_FEE_PERCENT) / 100;
+        uint256 merchantPayment = item.price - platformFee;
+
         // Create purchase record
         purchaseCount++;
         uint256 purchaseId = purchaseCount;
-        
+
+        // Update state before external calls
+        // Add platform fee to accumulated fees
+        platformFees += platformFee;
+
+        // Update merchant's total sales (but not pending payment since it's paid immediately)
+        merchants[item.merchant].totalSales += item.price;
+
+        // Record the purchase as already paid
         purchases[purchaseId] = Purchase({
             id: purchaseId,
             buyer: sender,
@@ -227,49 +279,63 @@ contract Merchant is Ownable, ReentrancyGuard {
             itemId: itemId,
             price: item.price,
             timestamp: block.timestamp,
-            isPaid: false
+            isPaid: true
         });
-        
-        // Update merchant's pending payment
-        uint256 platformFee = (item.price * PLATFORM_FEE_PERCENT) / 100;
-        uint256 merchantPayment = item.price - platformFee;
-        
-        merchants[item.merchant].pendingPayment += merchantPayment;
-        merchants[item.merchant].totalSales += item.price;
-        platformFees += platformFee;
-        
+
+        // External calls after state updates
+        // Burn ySYLD tokens from user
+        ySYLD.burnFrom(sender, item.requiredYSYLD);
+
+        // Automatically pay the merchant
+        treasury.transferUSDC(item.merchant, merchantPayment);
+
         emit ItemPurchased(purchaseId, sender, item.merchant, itemId, item.price);
+        emit MerchantPaid(item.merchant, merchantPayment);
     }
 
     /**
-     * @notice Pay a merchant for their sales
+     * @notice Pay a merchant for their pending sales (legacy function for backward compatibility)
+     * @dev This function is kept for backward compatibility with purchases made before the auto-payment update
      * @param merchantAddress Address of the merchant to pay
      */
     function payMerchant(address merchantAddress) external onlyOwner nonReentrant {
-        require(merchants[merchantAddress].isRegistered, "Not a registered merchant");
-        
+        if (!merchants[merchantAddress].isRegistered) revert NotRegistered();
+        if (merchantAddress == address(0)) revert ZeroAddress("merchantAddress");
+
         uint256 pendingAmount = merchants[merchantAddress].pendingPayment;
-        require(pendingAmount > 0, "No pending payment");
-        
-        // Reset pending payment before transfer
+        if (pendingAmount == 0) revert NoPendingPayment();
+
+        // Update state before external calls
+        // Reset pending payment
         merchants[merchantAddress].pendingPayment = 0;
-        
+
+        // Update purchase records to mark them as paid
+        for (uint256 i = 1; i <= purchaseCount; i++) {
+            Purchase storage purchase = purchases[i];
+            if (purchase.merchant == merchantAddress && !purchase.isPaid) {
+                purchase.isPaid = true;
+            }
+        }
+
+        // External call after state updates
         // Transfer USDC from treasury to merchant
         treasury.transferUSDC(merchantAddress, pendingAmount);
-        
+
         emit MerchantPaid(merchantAddress, pendingAmount);
     }
 
     /**
      * @notice Collect platform fees to treasury
+     * @dev This function doesn't actually transfer funds as fees are already in the treasury,
+     *      it just resets the counter and emits an event
      */
     function collectPlatformFees() external onlyOwner nonReentrant {
         uint256 feesToCollect = platformFees;
-        require(feesToCollect > 0, "No fees to collect");
-        
-        // Reset platform fees before transfer
+        if (feesToCollect == 0) revert NoFeesToCollect();
+
+        // Reset platform fees
         platformFees = 0;
-        
+
         // No need to transfer as fees are already in the treasury
         emit PlatformFeesCollected(feesToCollect);
     }
@@ -320,7 +386,8 @@ contract Merchant is Ownable, ReentrancyGuard {
         uint256 requiredYSYLD,
         bool isActive
     ) {
-        require(itemId > 0 && itemId <= itemCount, "Invalid item ID");
+        if (itemId == 0 || itemId > itemCount) revert InvalidItemId();
+
         Item storage item = items[itemId];
         return (
             item.id,
@@ -353,7 +420,8 @@ contract Merchant is Ownable, ReentrancyGuard {
         uint256 timestamp,
         bool isPaid
     ) {
-        require(purchaseId > 0 && purchaseId <= purchaseCount, "Invalid purchase ID");
+        if (purchaseId == 0 || purchaseId > purchaseCount) revert InvalidPurchaseId();
+
         Purchase storage purchase = purchases[purchaseId];
         return (
             purchase.id,
@@ -381,11 +449,13 @@ contract Merchant is Ownable, ReentrancyGuard {
      * @return Whether the user is eligible to purchase the item
      */
     function isEligibleForPurchase(address user, uint256 itemId) external view returns (bool) {
-        require(itemId > 0 && itemId <= itemCount, "Invalid item ID");
+        if (itemId == 0 || itemId > itemCount) revert InvalidItemId();
+        if (user == address(0)) revert ZeroAddress("user");
+
         Item storage item = items[itemId];
-        
+
         if (!item.isActive) return false;
-        
+
         uint256 ySYLDBalance = ySYLD.balanceOf(user);
         return ySYLDBalance >= item.requiredYSYLD;
     }
