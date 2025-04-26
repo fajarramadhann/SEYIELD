@@ -90,8 +90,25 @@ export function useFaucet() {
 
   // Update claimable status based on contract data
   useEffect(() => {
-    setIsClaimable(!!canClaim)
-  }, [canClaim])
+    // If we have a definite response from the contract
+    if (canClaim !== undefined) {
+      setIsClaimable(!!canClaim)
+    } else if (lastClaimTime === BigInt(0)) {
+      // If lastClaimTime is 0, user has never claimed before
+      setIsClaimable(true)
+    }
+
+    // Set a timeout to enable claiming if the contract doesn't respond in time
+    // This prevents the UI from getting stuck in the "checking eligibility" state
+    const timeoutId = setTimeout(() => {
+      if (!isClaimable && canClaim === undefined && isConnected) {
+        console.log("Faucet eligibility check timed out, enabling claim button")
+        setIsClaimable(true)
+      }
+    }, 5000) // 5 seconds timeout
+
+    return () => clearTimeout(timeoutId)
+  }, [canClaim, lastClaimTime, isClaimable, isConnected])
 
   // Handle claim completion
   useEffect(() => {

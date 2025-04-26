@@ -1,112 +1,156 @@
-export const shopItems = [
+// Shop items metadata to enhance blockchain data
+export const shopItemsMetadata = [
   {
     id: 1,
-    name: "Coursera Subscription",
-    category: "education",
-    price: 49,
-    depositRequired: 700,
-    description: "Annual subscription to Coursera with access to all courses and specializations.",
+    category: "electronics",
     image: "/placeholder.svg?height=200&width=200",
     popular: true,
-    details: "Unlimited access to 7,000+ world-class courses, hands-on projects, and job-ready certificate programs.",
-    merchant: "Coursera, Inc.",
-    merchantAddress: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    details: "High-quality noise-cancelling headphones with premium sound and comfort for long listening sessions.",
     features: [
-      "Access to all courses and specializations",
-      "Unlimited certificates",
-      "Learn at your own pace",
-      "Access on mobile and desktop"
+      "Active noise cancellation",
+      "40-hour battery life",
+      "Premium sound quality",
+      "Comfortable fit"
     ]
   },
   {
     id: 2,
-    name: "Udemy Course Bundle",
-    category: "education",
-    price: 29.99,
-    depositRequired: 428,
-    description: "Bundle of 5 top-rated courses on web development and design.",
+    category: "wearables",
     image: "/placeholder.svg?height=200&width=200",
-    details: "Includes courses on React, Node.js, UI/UX Design, JavaScript, and CSS frameworks.",
-    merchant: "Udemy",
-    merchantAddress: "0x22d491Bde2303f2f43325b2108D26f1eAbA1e32b",
+    details: "Latest smartwatch with fitness tracking, notifications, and health monitoring features.",
     features: [
-      "5 top-rated courses",
-      "Lifetime access",
-      "Downloadable resources",
-      "Certificate of completion"
+      "Heart rate monitoring",
+      "Sleep tracking",
+      "Water resistant",
+      "7-day battery life"
     ]
   },
   {
     id: 3,
-    name: "Amazon Gift Card",
-    category: "gifts",
-    price: 25,
-    depositRequired: 357,
-    description: "Digital gift card for Amazon with no expiration date.",
+    category: "vouchers",
     image: "/placeholder.svg?height=200&width=200",
     popular: true,
-    details: "Redeemable for millions of items storewide at Amazon.com.",
-    merchant: "Amazon",
-    merchantAddress: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    details: "Voucher for $200 off a new laptop purchase from major retailers.",
     features: [
+      "Valid at major electronics retailers",
       "No expiration date",
-      "Redeemable for millions of items",
-      "Instant delivery",
-      "No fees"
+      "Combinable with other offers",
+      "Easy to redeem"
     ]
   },
   {
     id: 4,
-    name: "Spotify Premium",
-    category: "entertainment",
-    price: 9.99,
-    depositRequired: 143,
-    description: "1-year subscription to Spotify Premium.",
+    category: "gaming",
     image: "/placeholder.svg?height=200&width=200",
-    details: "Ad-free music listening, offline downloads, and unlimited skips for 12 months.",
-    merchant: "Spotify",
-    merchantAddress: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    details: "Latest gaming console with two controllers and a selection of popular games.",
     features: [
-      "Ad-free music listening",
-      "Offline downloads",
-      "Unlimited skips",
-      "High quality audio"
+      "4K gaming",
+      "1TB storage",
+      "Two wireless controllers",
+      "Online multiplayer"
     ]
   },
   {
     id: 5,
-    name: "Netflix Subscription",
-    category: "entertainment",
-    price: 15.99,
-    depositRequired: 228,
-    description: "6-month Netflix Standard subscription.",
+    category: "electronics",
     image: "/placeholder.svg?height=200&width=200",
-    details: "Watch on 2 screens at the same time with Full HD (1080p) quality.",
-    merchant: "Netflix",
-    merchantAddress: "0x22d491Bde2303f2f43325b2108D26f1eAbA1e32b",
+    details: "Latest smartphone with premium camera, fast processor, and long battery life.",
     features: [
-      "Watch on 2 screens at the same time",
-      "Full HD (1080p) quality",
-      "Download on 2 devices",
-      "Unlimited movies and TV shows"
+      "Triple camera system",
+      "All-day battery life",
+      "5G connectivity",
+      "Water resistant"
+    ]
+  }
+]
+
+// Fallback shop items in case blockchain data is not available
+export const fallbackShopItems = [
+  {
+    id: 1,
+    name: "Premium Headphones",
+    category: "electronics",
+    price: 50,
+    description: "High-quality noise-cancelling headphones with premium sound",
+    image: "/placeholder.svg?height=200&width=200",
+    popular: true,
+    details: "High-quality noise-cancelling headphones with premium sound and comfort for long listening sessions.",
+    merchant: "SEYIELD Official Store",
+    merchantAddress: "0xF88A7306b8edCc6Ffa48bF0EA1F0f530a6bC1D30",
+    features: [
+      "Active noise cancellation",
+      "40-hour battery life",
+      "Premium sound quality",
+      "Comfortable fit"
     ]
   },
   {
-    id: 6,
-    name: "DoorDash Credit",
-    category: "food",
-    price: 20,
-    depositRequired: 286,
-    description: "Credit for food delivery on DoorDash.",
+    id: 2,
+    name: "Smart Watch",
+    category: "wearables",
+    price: 100,
+    description: "Latest smartwatch with fitness tracking and notifications",
     image: "/placeholder.svg?height=200&width=200",
-    details: "Order from your favorite restaurants with free delivery on your first order.",
-    merchant: "DoorDash",
-    merchantAddress: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    details: "Latest smartwatch with fitness tracking, notifications, and health monitoring features.",
+    merchant: "SEYIELD Official Store",
+    merchantAddress: "0xF88A7306b8edCc6Ffa48bF0EA1F0f530a6bC1D30",
     features: [
-      "Order from your favorite restaurants",
-      "Free delivery on your first order",
+      "Heart rate monitoring",
+      "Sleep tracking",
+      "Water resistant",
+      "7-day battery life"
+    ]
+  },
+  {
+    id: 3,
+    name: "Laptop Voucher",
+    category: "vouchers",
+    price: 200,
+    description: "Voucher for $200 off a new laptop purchase",
+    image: "/placeholder.svg?height=200&width=200",
+    popular: true,
+    details: "Voucher for $200 off a new laptop purchase from major retailers.",
+    merchant: "SEYIELD Official Store",
+    merchantAddress: "0xF88A7306b8edCc6Ffa48bF0EA1F0f530a6bC1D30",
+    features: [
+      "Valid at major electronics retailers",
       "No expiration date",
+      "Combinable with other offers",
       "Easy to redeem"
+    ]
+  },
+  {
+    id: 4,
+    name: "Gaming Console",
+    category: "gaming",
+    price: 300,
+    description: "Latest gaming console with two controllers",
+    image: "/placeholder.svg?height=200&width=200",
+    details: "Latest gaming console with two controllers and a selection of popular games.",
+    merchant: "SEYIELD Official Store",
+    merchantAddress: "0xF88A7306b8edCc6Ffa48bF0EA1F0f530a6bC1D30",
+    features: [
+      "4K gaming",
+      "1TB storage",
+      "Two wireless controllers",
+      "Online multiplayer"
+    ]
+  },
+  {
+    id: 5,
+    name: "Smartphone",
+    category: "electronics",
+    price: 500,
+    description: "Latest smartphone with premium camera and features",
+    image: "/placeholder.svg?height=200&width=200",
+    details: "Latest smartphone with premium camera, fast processor, and long battery life.",
+    merchant: "SEYIELD Official Store",
+    merchantAddress: "0xF88A7306b8edCc6Ffa48bF0EA1F0f530a6bC1D30",
+    features: [
+      "Triple camera system",
+      "All-day battery life",
+      "5G connectivity",
+      "Water resistant"
     ]
   }
 ]

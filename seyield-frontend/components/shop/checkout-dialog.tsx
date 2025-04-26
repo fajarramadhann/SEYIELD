@@ -30,7 +30,8 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
     isPurchaseLoading,
     isPurchaseComplete,
     handlePurchaseItem,
-    ySYLDBalance
+    ySYLDBalance,
+    purchaseData
   } = useMerchantContract()
 
   // Format ySYLD balance for display
@@ -49,9 +50,21 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
     }
 
     // Check if user has enough ySYLD
-    if (ySYLDBalance && typeof ySYLDBalance === 'bigint' && ySYLDBalance < BigInt(product.price * 10**6)) {
-      setErrorMessage(`Insufficient ySYLD balance. You need at least ${product.price} ySYLD but you only have ${formattedYSYLDBalance} ySYLD.`)
-      setStep("error")
+    if (ySYLDBalance && typeof ySYLDBalance === 'bigint') {
+      const requiredAmount = BigInt(Math.round(product.price * 10**6)); // Convert to bigint with 6 decimals
+
+      if (ySYLDBalance < requiredAmount) {
+        setErrorMessage(`Insufficient ySYLD balance. You need at least ${product.price ? product.price.toFixed(2) : '0.00'} ySYLD but you only have ${formattedYSYLDBalance} ySYLD.`)
+        setStep("error")
+        return
+      }
+    } else {
+      toast({
+        title: "Balance error",
+        description: "Could not verify your ySYLD balance. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      })
       return
     }
 
@@ -62,6 +75,13 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
         description: "Please confirm the transaction in your wallet when prompted.",
         duration: 5000,
       })
+
+      console.log("Purchasing item:", {
+        itemId: product.id,
+        name: product.name,
+        price: product.price,
+        userBalance: formattedYSYLDBalance
+      });
 
       // Call the merchant contract to purchase the item
       // The loading state will be handled by the useEffect watching isPurchaseLoading
@@ -76,6 +96,10 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
           errorMsg = "You rejected the transaction in your wallet. You can try again when ready."
         } else if (error.message.includes("insufficient funds")) {
           errorMsg = "You don't have enough SEI to pay for the transaction gas fees."
+        } else if (error.message.includes("InsufficientYield")) {
+          errorMsg = "You don't have enough ySYLD tokens to make this purchase."
+        } else if (error.message.includes("InvalidItem")) {
+          errorMsg = "This item is no longer available for purchase."
         } else {
           errorMsg = error.message
         }
@@ -95,17 +119,23 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
 
     // When purchase is complete, show success step
     if (isPurchaseComplete) {
-      // Set the transaction ID to the purchase ID
-      setTransactionId(product.id.toString())
+      // Set the transaction ID to the transaction hash if available
+      if (typeof purchaseData === 'string') {
+        setTransactionId(purchaseData)
+      } else {
+        // Fallback to product ID if no transaction hash
+        setTransactionId(product.id.toString())
+      }
+
       setStep("success")
 
       toast({
         title: "Purchase successful!",
-        description: `You've purchased ${product.name} for ${product.price} USDC using your rewards.`,
+        description: `You've purchased ${product.name} for ${product.price ? product.price.toFixed(2) : '0.00'} ySYLD tokens.`,
         duration: 5000,
       })
     }
-  }, [isPurchaseLoading, isPurchaseComplete, product, toast])
+  }, [isPurchaseLoading, isPurchaseComplete, purchaseData, product, toast])
 
   // Reset step when dialog opens
   useEffect(() => {
@@ -116,7 +146,14 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
   }, [open])
 
   const handleViewTransaction = () => {
-    router.push(`/transactions/${transactionId}`)
+    // If it's a transaction hash, open in explorer
+    if (transactionId?.startsWith('0x')) {
+      const explorerUrl = `https://sei.explorers.guru/tx/${transactionId}`
+      window.open(explorerUrl, '_blank')
+    } else {
+      // Otherwise, go to transactions page
+      router.push(`/transactions/${transactionId}`)
+    }
     onOpenChange(false)
   }
 
@@ -146,7 +183,7 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
                   <p className="text-sm text-muted-foreground">{product?.description}</p>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Price:</span>
-                    <span className="font-medium">{product?.price} USDC</span>
+                    <span className="font-medium">{product?.price ? product.price.toFixed(2) : '0.00'} ySYLD</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Merchant:</span>
@@ -159,11 +196,11 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
                 <h4 className="font-medium">Purchase Details</h4>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Item Price:</span>
-                  <span className="font-medium">{product?.price} USDC</span>
+                  <span className="font-medium">{product?.price ? product.price.toFixed(2) : '0.00'} ySYLD</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Required ySYLD:</span>
-                  <span className="font-medium">{product?.price} ySYLD</span>
+                  <span className="font-medium">{product?.price ? product.price.toFixed(2) : '0.00'} ySYLD</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Your ySYLD Balance:</span>
@@ -277,8 +314,12 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
               </div>
               <div className="w-full max-w-xs space-y-2 mb-6">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Transaction ID:</span>
-                  <span className="font-medium">{transactionId}</span>
+                  <span className="text-muted-foreground">Transaction:</span>
+                  <span className="font-medium truncate max-w-[180px]" title={transactionId}>
+                    {transactionId?.startsWith('0x')
+                      ? `${transactionId.substring(0, 6)}...${transactionId.substring(transactionId.length - 4)}`
+                      : transactionId}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Item:</span>
@@ -286,11 +327,11 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-medium">{product?.price} USDC</span>
+                  <span className="font-medium">{product?.price ? product.price.toFixed(2) : '0.00'} ySYLD</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">ySYLD Spent:</span>
-                  <span className="font-medium">{product?.price} ySYLD</span>
+                  <span className="text-muted-foreground">Merchant:</span>
+                  <span className="font-medium">{product?.merchant || "SEYIELD Official Store"}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Status:</span>
@@ -313,12 +354,14 @@ export function CheckoutDialog({ open, onOpenChange, product }) {
                 <Button variant="outline" onClick={() => onOpenChange(false)}>
                   Close
                 </Button>
-                <Button
-                  onClick={handleViewTransaction}
-                  className="gap-2 bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700"
-                >
-                  View Transaction
-                </Button>
+                {transactionId && (
+                  <Button
+                    onClick={handleViewTransaction}
+                    className="gap-2 bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700"
+                  >
+                    {transactionId?.startsWith('0x') ? 'View on Explorer' : 'View Transaction'}
+                  </Button>
+                )}
               </div>
             </div>
           </>
